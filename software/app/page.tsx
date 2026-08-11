@@ -313,13 +313,35 @@ const PUNCTUATION_DOTS: Record<string, number[]> = {
   "(": [1, 2, 6], ")": [3, 4, 5],
 };
 
+const SYMBOL_DOTS: Record<string, number[]> = {
+  "\"": [5, 6],
+  "/": [3, 4],
+  "\\": [1, 2, 5, 6],
+  "@": [4, 5],
+  "#": [3, 4, 5, 6],
+  "$": [1, 2, 4, 6],
+  "%": [1, 4, 6],
+  "&": [1, 2, 3, 4, 6],
+  "*": [1, 6],
+  "+": [2, 3, 5],
+  "=": [1, 2, 3, 4, 5, 6],
+  "<": [1, 2, 6],
+  ">": [3, 4, 5],
+  "[": [2, 4, 6],
+  "]": [1, 2, 4, 5, 6],
+  "{": [2, 4, 6],
+  "}": [1, 2, 4, 5, 6],
+  "_": [4, 5, 6],
+  "`": [4],
+  "^": [4, 5],
+  "~": [4, 5, 6],
+  "|": [1, 2, 5, 6],
+};
+
 const DIGIT_LETTERS: Record<string, string> = {
   "1": "a", "2": "b", "3": "c", "4": "d", "5": "e",
   "6": "f", "7": "g", "8": "h", "9": "i", "0": "j",
 };
-
-const CAPITAL_DOTS = [6];
-const NUMBER_DOTS = [3, 4, 5, 6];
 
 function dotsToUnicode(dots: number[]) {
   const value = dots.reduce((sum, dot) => sum + (1 << (dot - 1)), 0);
@@ -348,20 +370,30 @@ function cellsToWokwiBatchPayload(
   return `BATCH:${holdMs},${blinkMs}|${cells.map((cell) => dotsToPinFrame(cell.dots)).join(",")}`;
 }
 
+function asciiToDots(character: string) {
+  if (character.length !== 1) return null;
+  const codePoint = character.codePointAt(0);
+  if (codePoint === undefined || codePoint < 32 || codePoint > 126) return null;
+
+  const dots: number[] = [];
+  for (let bit = 0; bit < 8; bit += 1) {
+    if ((codePoint & (1 << bit)) !== 0) {
+      dots.push(bit + 1);
+    }
+  }
+
+  return dots;
+}
+
 function textToBraille(text: string): BrailleCell[] {
   const cells: BrailleCell[] = [];
-  let inNumber = false;
 
   for (const character of text) {
     if (/\d/.test(character)) {
-      if (!inNumber) cells.push(makeCell(NUMBER_DOTS, "number sign", "#"));
-      inNumber = true;
       const letter = DIGIT_LETTERS[character];
       cells.push(makeCell(LETTER_DOTS[letter], `digit ${character}`, character));
       continue;
     }
-
-    inNumber = false;
 
     if (character === " ") {
       cells.push(makeCell([], "space", "space"));
@@ -370,16 +402,28 @@ function textToBraille(text: string): BrailleCell[] {
 
     const lower = character.toLowerCase();
     if (LETTER_DOTS[lower]) {
-      if (character !== lower) {
-        cells.push(makeCell(CAPITAL_DOTS, "capital sign", "capital"));
-      }
       cells.push(makeCell(LETTER_DOTS[lower], lower, character));
       continue;
     }
 
     if (PUNCTUATION_DOTS[character]) {
       cells.push(makeCell(PUNCTUATION_DOTS[character], character, character));
+      continue;
     }
+
+    if (SYMBOL_DOTS[character]) {
+      cells.push(makeCell(SYMBOL_DOTS[character], character, character));
+      continue;
+    }
+
+    const asciiDots = asciiToDots(character);
+    if (asciiDots) {
+      cells.push(makeCell(asciiDots, `ascii ${character}`, character));
+      continue;
+    }
+
+    // Keep transmission stable even for unsupported Unicode by emitting '?'.
+    cells.push(makeCell(PUNCTUATION_DOTS["?"], "?", character));
   }
 
   return cells;

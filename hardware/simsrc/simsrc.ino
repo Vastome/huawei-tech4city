@@ -102,7 +102,8 @@ bool applyRemoteTiming(const String &payload, Print &output);
 bool processBatchCommand(const String &payload, Print &output);
 bool parsePinToken(const String &token, byte &pattern);
 void processRemoteFrames(const String &payload, Print &output);
-void updateRemoteFrameStatus(int currentIndex, int totalFrames);
+char decodePatternToChar(byte pattern);
+void updateRemoteFrameStatus(int currentIndex, int totalFrames, byte pattern);
 
 byte getBraillePattern(char c) {
   char lc = tolower(c);
@@ -209,15 +210,31 @@ void announceReady(Print &port) {
   port.println("Send text, or send PINS:10100000,11000000 frames.");
 }
 
-void updateRemoteFrameStatus(int currentIndex, int totalFrames) {
+char decodePatternToChar(byte pattern) {
+  for (int i = 0; i < brailleTableSize; i++) {
+    if (brailleTable[i].pattern == pattern) {
+      return brailleTable[i].ch;
+    }
+  }
+  return '?';
+}
+
+void updateRemoteFrameStatus(int currentIndex, int totalFrames, byte pattern) {
+  char symbol = decodePatternToChar(pattern);
+
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Remote braille");
-  lcd.setCursor(0, 1);
   lcd.print("Frame ");
   lcd.print(currentIndex);
   lcd.print("/");
   lcd.print(totalFrames);
+  lcd.setCursor(0, 1);
+  lcd.print("Char: ");
+  if (symbol == ' ') {
+    lcd.print("[space]");
+  } else {
+    lcd.print(symbol);
+  }
 }
 
 bool applyRemoteTiming(const String &payload, Print &output) {
@@ -312,7 +329,7 @@ void processRemoteFrames(const String &payload, Print &output) {
     output.print(frameIndex);
     output.print("/");
     output.println(totalFrames);
-    updateRemoteFrameStatus(frameIndex, totalFrames);
+    updateRemoteFrameStatus(frameIndex, totalFrames, pattern);
     playBraille(pattern, remoteLetterDisplayMs, remoteBlinkMs);
 
     if (separator == -1) {
