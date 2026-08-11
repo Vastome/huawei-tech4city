@@ -1,8 +1,13 @@
-# Micro-Tactile Reader — Live OCR to Text
+# Huawei Tech4City Software — Live OCR to Text
 
 Working software prototype for the Tech4City 2026 Semi-Final.
 
+Canonical repository:
+https://github.com/Vastome/huawei-tech4city
+
 This folder is the software half of the combined workspace. The companion Pico and Wokwi hardware prototype now lives in the sibling `hardware/` folder.
+
+Note: this folder is maintained inside the main repository above (it is not a separate Git repository).
 
 The prototype captures one line of clear printed English through a live camera,
 runs OCR locally in the browser, and sends OCR-derived pin frames to the

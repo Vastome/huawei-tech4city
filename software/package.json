@@ -2,6 +2,14 @@
   "name": "site-creator-vinext-starter",
   "version": "0.1.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Vastome/huawei-tech4city.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Vastome/huawei-tech4city/issues"
+  },
+  "homepage": "https://github.com/Vastome/huawei-tech4city",
   "engines": {
     "node": ">=22.13.0"
   },

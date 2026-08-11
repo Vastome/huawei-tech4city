@@ -2,7 +2,12 @@
 
 Built for the Huawei Tech4City competition by the Vastome team.
 
+Canonical repository:
+https://github.com/Vastome/huawei-tech4city
+
 This folder contains the hardware half of the project: a Raspberry Pi Pico Wokwi simulation that shows an 8-dot braille pattern on a MAX7219 dot matrix and highlights the current character on an I2C LCD.
+
+Note: this folder is maintained inside the main repository above (it is not a separate Git repository).
 
 It now also accepts direct remote handoff frames over serial from the software demo.
 

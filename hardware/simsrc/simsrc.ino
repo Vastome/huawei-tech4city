@@ -65,7 +65,7 @@ const uint32_t DOT_COLOR_OFF = 0x000000;
 LiquidCrystal_I2C lcd(LCD_ADDR, LCD_COLS, LCD_ROWS);
 uint8_t dotMatrixFrame[8] = {0};
 
-String inputText = "BRAILLE OPENS BOOKS";
+String inputText = "";
 bool newTextReady = false;
 String uartInputBuffer;
 String usbInputBuffer;
@@ -396,7 +396,7 @@ void setup() {
   announceReady(Serial);
   announceReady(SerialPort);
 
-  newTextReady = true; // auto-run the preset text on startup
+  newTextReady = false;
 }
 
 void loop() {
