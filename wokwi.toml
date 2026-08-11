@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = 'simsrc/build/simsrc.ino.uf2'
+elf = 'simsrc/build/simsrc.ino.elf'

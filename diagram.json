@@ -1,0 +1,43 @@
+{
+    "version": 1,
+    "author": "Shashank Bagda",
+    "editor": "wokwi",
+    "parts": [
+      {
+        "type": "wokwi-pi-pico",
+        "id": "pico",
+        "top": 87.1,
+        "left": -136.35,
+        "rotate": 180,
+        "attrs": {}
+      },
+      {
+        "type": "wokwi-lcd1602",
+        "id": "lcd1",
+        "top": 83.2,
+        "left": 24.8,
+        "attrs": { "pins": "i2c" }
+      },
+      {
+        "type": "wokwi-max7219-matrix",
+        "id": "matrix1",
+        "top": -47.4,
+        "left": 26.64,
+        "attrs": { "chain": "1" }
+      }
+    ],
+    "connections": [
+      [ "pico:GP0", "$serialMonitor:RX", "", [] ],
+      [ "pico:GP1", "$serialMonitor:TX", "", [] ],
+      [ "pico:GP19", "matrix1:DIN", "orange", [] ],
+      [ "pico:GP18", "matrix1:CLK", "purple", [] ],
+      [ "pico:GP17", "matrix1:CS", "green", [] ],
+      [ "matrix1:VCC", "pico:3V3", "red", [] ],
+      [ "matrix1:GND", "pico:GND.3", "black", [] ],
+      [ "pico:GP4", "lcd1:SDA", "blue", [] ],
+      [ "pico:GP5", "lcd1:SCL", "green", [] ],
+      [ "lcd1:VCC", "pico:3V3", "red", [] ],
+      [ "lcd1:GND", "pico:GND.2", "black", [] ]
+    ],
+    "dependencies": {}
+  }
