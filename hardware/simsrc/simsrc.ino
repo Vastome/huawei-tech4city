@@ -49,23 +49,28 @@
 #define DOT_MATRIX_CLK  18  // GP18 -> CLK of the MAX7219 dot matrix
 #define DOT_MATRIX_CS   17  // GP17 -> CS  of the MAX7219 dot matrix
 
-const unsigned long LETTER_DISPLAY_MS = 900;      // time each letter is shown
-const unsigned long BLINK_MS          = 250;      // matrix on/off blink period
+const unsigned long DEFAULT_LETTER_DISPLAY_MS = 900; // time each letter is shown
+const unsigned long DEFAULT_BLINK_MS = 250;          // matrix on/off blink period
 
 // Color used for an "on" dot (dim white keeps it comfortable in sim/real use)
 const uint32_t DOT_COLOR_ON  = 0xFFFFFF; // R,G,B packed
 const uint32_t DOT_COLOR_OFF = 0x000000;
 
 // GP0/GP1 are wired to the Wokwi Serial Monitor via UART0 in
-// diagram.json, so we talk over Serial1 (arduino-pico core: UART0).
+// diagram.json, so we keep Serial1 for Wokwi while also listening on
+// USB Serial for the browser handoff path used on real hardware.
 #define SerialPort Serial1
 // ----------------------------------
 
 LiquidCrystal_I2C lcd(LCD_ADDR, LCD_COLS, LCD_ROWS);
 uint8_t dotMatrixFrame[8] = {0};
 
-String inputText = "Team Vastome - Huawei Tech4City";
+String inputText = "BRAILLE OPENS BOOKS";
 bool newTextReady = false;
+String uartInputBuffer;
+String usbInputBuffer;
+unsigned long remoteLetterDisplayMs = DEFAULT_LETTER_DISPLAY_MS;
+unsigned long remoteBlinkMs = DEFAULT_BLINK_MS;
 
 // ---- 8-dot Braille lookup table (dots 1-6 = standard braille, 7-8 unused = 0) ----
 struct BrailleMap {
@@ -90,6 +95,14 @@ const BrailleMap brailleTable[] = {
 const int brailleTableSize = sizeof(brailleTable) / sizeof(BrailleMap);
 
 void dotMatrixFlush();
+void announceReady(Print &port);
+void handleSerialInput(Stream &input, Print &output, String &buffer);
+bool handleCommandLine(const String &line, Print &output);
+bool applyRemoteTiming(const String &payload, Print &output);
+bool processBatchCommand(const String &payload, Print &output);
+bool parsePinToken(const String &token, byte &pattern);
+void processRemoteFrames(const String &payload, Print &output);
+void updateRemoteFrameStatus(int currentIndex, int totalFrames);
 
 byte getBraillePattern(char c) {
   char lc = tolower(c);
@@ -166,17 +179,17 @@ void updateLcdHighlight(const String &text, int activeIndex) {
   lcd.print(visible);
 }
 
-void playBraille(char c, byte pattern) {
+void playBraille(byte pattern, unsigned long displayMs, unsigned long blinkMs) {
   unsigned long start = millis();
   bool on = false;
-  while (millis() - start < LETTER_DISPLAY_MS) {
+  while (millis() - start < displayMs) {
     on = !on;
     if (on) {
       showPatternOnDotMatrix(pattern);
     } else {
       allDotsOff();
     }
-    delay(BLINK_MS);
+    delay(blinkMs);
   }
   allDotsOff();
 }
@@ -187,7 +200,169 @@ void processText(const String &text) {
     byte pattern = getBraillePattern(c);
 
     updateLcdHighlight(text, i);
-    playBraille(c, pattern);
+    playBraille(pattern, DEFAULT_LETTER_DISPLAY_MS, DEFAULT_BLINK_MS);
+  }
+}
+
+void announceReady(Print &port) {
+  port.println("Braille LED Display ready (Pico).");
+  port.println("Send text, or send PINS:10100000,11000000 frames.");
+}
+
+void updateRemoteFrameStatus(int currentIndex, int totalFrames) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Remote braille");
+  lcd.setCursor(0, 1);
+  lcd.print("Frame ");
+  lcd.print(currentIndex);
+  lcd.print("/");
+  lcd.print(totalFrames);
+}
+
+bool applyRemoteTiming(const String &payload, Print &output) {
+  int separator = payload.indexOf(',');
+  if (separator <= 0 || separator >= payload.length() - 1) {
+    output.println("ERR invalid CONFIG payload");
+    return false;
+  }
+
+  String holdToken = payload.substring(0, separator);
+  String blinkToken = payload.substring(separator + 1);
+  holdToken.trim();
+  blinkToken.trim();
+
+  unsigned long nextHold = holdToken.toInt();
+  unsigned long nextBlink = blinkToken.toInt();
+  if (nextHold < 150 || nextHold > 5000 || nextBlink < 60 || nextBlink > 2000) {
+    output.println("ERR CONFIG out of range");
+    return false;
+  }
+
+  remoteLetterDisplayMs = nextHold;
+  remoteBlinkMs = nextBlink;
+
+  output.print("ACK CONFIG ");
+  output.print(remoteLetterDisplayMs);
+  output.print(" ");
+  output.println(remoteBlinkMs);
+  return true;
+}
+
+bool processBatchCommand(const String &payload, Print &output) {
+  int separator = payload.indexOf('|');
+  if (separator <= 0 || separator >= payload.length() - 1) {
+    output.println("ERR invalid BATCH payload");
+    return false;
+  }
+
+  String configPayload = payload.substring(0, separator);
+  String framesPayload = payload.substring(separator + 1);
+
+  if (!applyRemoteTiming(configPayload, output)) {
+    return false;
+  }
+
+  processRemoteFrames(framesPayload, output);
+  return true;
+}
+
+bool parsePinToken(const String &token, byte &pattern) {
+  if (token.length() != 8) {
+    return false;
+  }
+
+  pattern = 0;
+  for (int index = 0; index < 8; index++) {
+    char bit = token.charAt(index);
+    if (bit != '0' && bit != '1') {
+      return false;
+    }
+    if (bit == '1') {
+      pattern |= (1 << index);
+    }
+  }
+
+  return true;
+}
+
+void processRemoteFrames(const String &payload, Print &output) {
+  int totalFrames = 1;
+  for (int index = 0; index < (int)payload.length(); index++) {
+    if (payload.charAt(index) == ',') {
+      totalFrames += 1;
+    }
+  }
+
+  int frameIndex = 0;
+  int start = 0;
+  while (start <= (int)payload.length()) {
+    int separator = payload.indexOf(',', start);
+    String token = separator == -1 ? payload.substring(start) : payload.substring(start, separator);
+    token.trim();
+
+    byte pattern = 0;
+    if (!parsePinToken(token, pattern)) {
+      output.println("ERR invalid PINS payload");
+      return;
+    }
+
+    frameIndex += 1;
+    output.print("FRAME ");
+    output.print(frameIndex);
+    output.print("/");
+    output.println(totalFrames);
+    updateRemoteFrameStatus(frameIndex, totalFrames);
+    playBraille(pattern, remoteLetterDisplayMs, remoteBlinkMs);
+
+    if (separator == -1) {
+      break;
+    }
+    start = separator + 1;
+  }
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Remote done");
+  lcd.setCursor(0, 1);
+  lcd.print("Awaiting next");
+  output.println("OK remote frames displayed");
+}
+
+bool handleCommandLine(const String &line, Print &output) {
+  if (line.startsWith("BATCH:")) {
+    return processBatchCommand(line.substring(6), output);
+  }
+
+  if (line.startsWith("CONFIG:")) {
+    return applyRemoteTiming(line.substring(7), output);
+  }
+
+  if (!line.startsWith("PINS:")) {
+    return false;
+  }
+
+  processRemoteFrames(line.substring(5), output);
+  return true;
+}
+
+void handleSerialInput(Stream &input, Print &output, String &buffer) {
+  while (input.available()) {
+    char c = input.read();
+    if (c == '\n' || c == '\r') {
+      if (buffer.length() == 0) {
+        continue;
+      }
+
+      if (!handleCommandLine(buffer, output)) {
+        inputText = buffer;
+        newTextReady = true;
+      }
+      buffer = "";
+      continue;
+    }
+
+    buffer += c;
   }
 }
 
@@ -197,7 +372,8 @@ void setup() {
   pinMode(DOT_MATRIX_DIN, OUTPUT);
   digitalWrite(DOT_MATRIX_CS, HIGH);
 
-  SerialPort.begin(9600);
+  Serial.begin(115200);
+  SerialPort.begin(115200);
 
   dotMatrixWrite(0x0F, 0x00); // display test off
   dotMatrixWrite(0x0C, 0x01); // normal operation
@@ -214,28 +390,22 @@ void setup() {
   lcd.setCursor(0, 0);
   lcd.print("Braille LED Demo");
   lcd.setCursor(0, 1);
-  lcd.print("Starting...");
+  lcd.print("Ready for text");
   delay(1500);
 
-  SerialPort.println("Braille LED Display ready (Pico).");
-  SerialPort.println("Type a word/sentence and press Enter.");
+  announceReady(Serial);
+  announceReady(SerialPort);
 
   newTextReady = true; // auto-run the preset text on startup
 }
 
 void loop() {
-  if (SerialPort.available()) {
-    char c = SerialPort.read();
-    if (c == '\n' || c == '\r') {
-      if (inputText.length() > 0) {
-        newTextReady = true;
-      }
-    } else {
-      inputText += c;
-    }
-  }
+  handleSerialInput(Serial, Serial, usbInputBuffer);
+  handleSerialInput(SerialPort, SerialPort, uartInputBuffer);
 
   if (newTextReady) {
+    Serial.print("Displaying: ");
+    Serial.println(inputText);
     SerialPort.print("Displaying: ");
     SerialPort.println(inputText);
     processText(inputText);

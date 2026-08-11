@@ -1,64 +1,100 @@
-# Huawei Tech4City Braille Display
+# Huawei Tech4City Reader
 
-Built for the Huawei Tech4City competition by the Vastome team.
+Unified hardware + software workspace for the Tech4City demo.
 
-This repository contains a Raspberry Pi Pico Wokwi simulation that shows an 8-dot braille pattern on a MAX7219 dot matrix and highlights the current character on an I2C LCD.
+This repository includes:
 
-## What this repo includes
+- `hardware/`: Raspberry Pi Pico + Wokwi hardware simulation (MAX7219 + LCD)
+- `software/`: browser OCR app that captures printed text and sends hardware frames
+- `run_project.py`: cross-platform launcher for install, demo, and verification
+- `wokwi_terminal_bridge.py`: local bridge for Wokwi Serial Monitor handoff
 
-- `sketch.ino` - the Pico sketch
-- `diagram.json` - the Wokwi circuit
-- `wokwi.toml` - local simulator configuration
-- `setup_wokwi.py` - cross-platform bootstrap script
+## Requirements
 
-## What the setup script does
+- Python 3.10+
+- Node.js 22.13+
+- VS Code with Wokwi extension (for simulator workflow)
+- Chrome or Edge desktop (required for Web Serial to real Pico)
 
-`setup_wokwi.py` prepares the project for local use on Windows, Ubuntu, or macOS:
+## Quick Start (Default Demo)
 
-- copies the main sketch into the build folder Wokwi uses for firmware generation
-- downloads Arduino CLI if it is not already installed
-- installs the Arduino RP2040 core
-- installs the LCD library used by the sketch
-- compiles the firmware into `simsrc/build/`
-- refreshes `wokwi.toml` so it points to the generated firmware
-
-On iOS, the script only prepares the project files. Native firmware compilation and the desktop Wokwi extension are not available there, so use the browser-based Wokwi simulator for viewing the diagram or run the setup script on a desktop OS to build the firmware.
-
-## Quick start
-
-1. Install Python 3.10 or newer.
-2. Run the setup script from the repository root:
+From repository root:
 
 ```bash
-python setup_wokwi.py
+python run_project.py
 ```
 
-3. Open `diagram.json` in VS Code.
-4. Start the simulator with `Wokwi: Start Simulator`.
+Default behavior with no arguments:
 
-If you already have Arduino CLI installed and want to skip tool installation, the script will still use it when available.
+1. Compiles/prepares hardware firmware via `hardware/setup_wokwi.py`
+2. Opens hardware and software files in VS Code when `code` CLI is available
+3. Starts a fresh local bridge automatically
+4. Starts software dev server automatically
+5. If bridge port `8765` is busy, chooses a free port automatically and injects it into the app
 
-## Manual simulator setup
+## Command Reference
 
-If you want to do the build steps yourself:
-
-1. Compile the sketch for the Raspberry Pi Pico.
-2. Place the generated firmware files under `simsrc/build/`.
-3. Keep `wokwi.toml` pointing to:
-
-```toml
-[wokwi]
-version = 1
-firmware = 'simsrc/build/simsrc.ino.uf2'
-elf = 'simsrc/build/simsrc.ino.elf'
+```bash
+python run_project.py install
+python run_project.py demo
+python run_project.py demo --prepare-only
+python run_project.py hardware --prepare-only
+python run_project.py software dev
+python run_project.py bridge
+python run_project.py verify
 ```
 
-## Project notes
+- `install`: install software dependencies and prepare hardware files
+- `demo`: full integrated run (hardware prep + bridge + software dev)
+- `hardware`: run only hardware setup/compile path
+- `software <script>`: run software script (`dev`, `build`, `start`, `test`, `lint`)
+- `bridge`: run the local Wokwi bridge directly
+- `verify`: hardware compile + software tests + lint
 
-- The braille display is wired for the Vastome Huawei Tech4City build.
-- The MAX7219 matrix uses the top-left 4x2 area for the 8-dot braille cell.
-- The serial monitor is connected over UART on GP0 and GP1.
+## End-to-End Demo Flow
+
+1. Run `python run_project.py`.
+2. In the browser app, click `Start camera`, grant permission, and scan one printed line.
+3. In VS Code, open `hardware/diagram.json` and start Wokwi simulator.
+4. Keep Wokwi Serial Monitor focused while scanning.
+5. The app shows recognized OCR text and send state (`Waiting to send`, `Sending`, `Sent`, `Send failed`).
+6. OCR output is sent to selected hardware target:
+	 - Wokwi: through local bridge as one `BATCH:` command
+	 - Real Pico: via Web Serial (`CONFIG:` then `PINS:`)
+
+## Hardware Protocol
+
+Software to hardware commands:
+
+- `CONFIG:<holdMs>,<blinkMs>`
+- `PINS:<8bit>,<8bit>,...`
+- `BATCH:<holdMs>,<blinkMs>|<8bit>,<8bit>,...`
+
+Hardware replies include:
+
+- `ACK CONFIG ...`
+- `FRAME x/y`
+- `OK remote frames displayed`
+- `ERR ...`
+
+## Troubleshooting
+
+- `code` not found:
+	- Demo continues without auto-opening files.
+	- Optionally enable VS Code PATH integration.
+- Bridge send fails:
+	- Ensure Wokwi Serial Monitor is focused.
+	- Use `Copy Wokwi command` fallback in the app.
+- Port conflict:
+	- Demo auto-selects a free bridge port and passes it to software.
+- Camera or Web Serial unavailable:
+	- Use a modern desktop browser and grant permissions.
+
+## Repository Structure
+
+- `hardware/README.md`: hardware-specific setup and notes
+- `software/README.md`: software-specific setup and tests
 
 ## License
 
-This project is released under the MIT License. See [LICENSE](LICENSE).
+See `LICENSE`.

@@ -1,5 +1,5 @@
 # Build artifacts
-simsrc/build/
+hardware/simsrc/build/
 *.uf2
 *.elf
 *.hex
@@ -7,7 +7,7 @@ simsrc/build/
 *.map
 
 # Local tool downloads
-.tools/
+hardware/.tools/
 
 # Python cache
 __pycache__/

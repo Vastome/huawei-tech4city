@@ -198,7 +198,13 @@ def main() -> int:
     ensure_wokwi_toml()
     mirror_sketch_to_wrapper()
 
-    if args.prepare_only or is_ios():
+    if args.prepare_only:
+        print("Project files are ready.")
+        print("Native tool installation and firmware compilation were skipped because --prepare-only was requested.")
+        print("Run this script without --prepare-only on Windows, Ubuntu, or macOS to build firmware locally.")
+        return 0
+
+    if is_ios():
         print("Project files are ready.")
         print("On iOS, native tool installation and firmware compilation are skipped.")
         print("Use the browser-based Wokwi simulator, or run this script on Windows, Ubuntu, or macOS to build firmware locally.")
