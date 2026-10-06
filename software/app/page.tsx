@@ -1,6 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  cellsToHardwarePayload,
+  cellsToWokwiBatchPayload,
+  dotsToPinFrame,
+  textToBraille,
+  type BrailleCell,
+} from "../lib/braille";
 
 type SerialPortHandle = {
   open: (options: { baudRate: number }) => Promise<void>;
@@ -30,13 +37,6 @@ declare global {
     };
   }
 }
-
-type BrailleCell = {
-  dots: number[];
-  label: string;
-  source: string;
-  unicode: string;
-};
 
 type OcrWorker = {
   recognize: (image: HTMLCanvasElement) => Promise<{
@@ -296,137 +296,6 @@ function scoreOcrResult(text: string, confidence: number) {
     Math.min(5, words.length) -
     (1 - readableRatio) * 18
   );
-}
-
-const LETTER_DOTS: Record<string, number[]> = {
-  a: [1], b: [1, 2], c: [1, 4], d: [1, 4, 5], e: [1, 5],
-  f: [1, 2, 4], g: [1, 2, 4, 5], h: [1, 2, 5], i: [2, 4], j: [2, 4, 5],
-  k: [1, 3], l: [1, 2, 3], m: [1, 3, 4], n: [1, 3, 4, 5], o: [1, 3, 5],
-  p: [1, 2, 3, 4], q: [1, 2, 3, 4, 5], r: [1, 2, 3, 5], s: [2, 3, 4],
-  t: [2, 3, 4, 5], u: [1, 3, 6], v: [1, 2, 3, 6], w: [2, 4, 5, 6],
-  x: [1, 3, 4, 6], y: [1, 3, 4, 5, 6], z: [1, 3, 5, 6],
-};
-
-const PUNCTUATION_DOTS: Record<string, number[]> = {
-  ",": [2], ";": [2, 3], ":": [2, 5], ".": [2, 5, 6],
-  "!": [2, 3, 5], "?": [2, 3, 6], "'": [3], "-": [3, 6],
-  "(": [1, 2, 6], ")": [3, 4, 5],
-};
-
-const SYMBOL_DOTS: Record<string, number[]> = {
-  "\"": [5, 6],
-  "/": [3, 4],
-  "\\": [1, 2, 5, 6],
-  "@": [4, 5],
-  "#": [3, 4, 5, 6],
-  "$": [1, 2, 4, 6],
-  "%": [1, 4, 6],
-  "&": [1, 2, 3, 4, 6],
-  "*": [1, 6],
-  "+": [2, 3, 5],
-  "=": [1, 2, 3, 4, 5, 6],
-  "<": [1, 2, 6],
-  ">": [3, 4, 5],
-  "[": [2, 4, 6],
-  "]": [1, 2, 4, 5, 6],
-  "{": [2, 4, 6],
-  "}": [1, 2, 4, 5, 6],
-  "_": [4, 5, 6],
-  "`": [4],
-  "^": [4, 5],
-  "~": [4, 5, 6],
-  "|": [1, 2, 5, 6],
-};
-
-const DIGIT_LETTERS: Record<string, string> = {
-  "1": "a", "2": "b", "3": "c", "4": "d", "5": "e",
-  "6": "f", "7": "g", "8": "h", "9": "i", "0": "j",
-};
-
-function dotsToUnicode(dots: number[]) {
-  const value = dots.reduce((sum, dot) => sum + (1 << (dot - 1)), 0);
-  return String.fromCodePoint(0x2800 + value);
-}
-
-function makeCell(dots: number[], label: string, source: string): BrailleCell {
-  return { dots, label, source, unicode: dotsToUnicode(dots) };
-}
-
-function dotsToPinFrame(dots: number[]) {
-  return Array.from({ length: 8 }, (_, index) => (
-    dots.includes(index + 1) ? "1" : "0"
-  )).join("");
-}
-
-function cellsToHardwarePayload(cells: BrailleCell[]) {
-  return `PINS:${cells.map((cell) => dotsToPinFrame(cell.dots)).join(",")}\n`;
-}
-
-function cellsToWokwiBatchPayload(
-  cells: BrailleCell[],
-  holdMs: number,
-  blinkMs: number,
-) {
-  return `BATCH:${holdMs},${blinkMs}|${cells.map((cell) => dotsToPinFrame(cell.dots)).join(",")}`;
-}
-
-function asciiToDots(character: string) {
-  if (character.length !== 1) return null;
-  const codePoint = character.codePointAt(0);
-  if (codePoint === undefined || codePoint < 32 || codePoint > 126) return null;
-
-  const dots: number[] = [];
-  for (let bit = 0; bit < 8; bit += 1) {
-    if ((codePoint & (1 << bit)) !== 0) {
-      dots.push(bit + 1);
-    }
-  }
-
-  return dots;
-}
-
-function textToBraille(text: string): BrailleCell[] {
-  const cells: BrailleCell[] = [];
-
-  for (const character of text) {
-    if (/\d/.test(character)) {
-      const letter = DIGIT_LETTERS[character];
-      cells.push(makeCell(LETTER_DOTS[letter], `digit ${character}`, character));
-      continue;
-    }
-
-    if (character === " ") {
-      cells.push(makeCell([], "space", "space"));
-      continue;
-    }
-
-    const lower = character.toLowerCase();
-    if (LETTER_DOTS[lower]) {
-      cells.push(makeCell(LETTER_DOTS[lower], lower, character));
-      continue;
-    }
-
-    if (PUNCTUATION_DOTS[character]) {
-      cells.push(makeCell(PUNCTUATION_DOTS[character], character, character));
-      continue;
-    }
-
-    if (SYMBOL_DOTS[character]) {
-      cells.push(makeCell(SYMBOL_DOTS[character], character, character));
-      continue;
-    }
-
-    const asciiDots = asciiToDots(character);
-    if (asciiDots) {
-      cells.push(makeCell(asciiDots, `ascii ${character}`, character));
-      continue;
-    }
-
-    // Keep transmission stable even for unsupported Unicode by emitting '?'.
-    cells.push(makeCell(PUNCTUATION_DOTS["?"], "?", character));
-  }
-
-  return cells;
 }
 
 const SPEEDS: Record<"Slow" | "Medium" | "Fast", number> = {

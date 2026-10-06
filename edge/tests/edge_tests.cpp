@@ -1,10 +1,14 @@
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <string>
 
+#include <opencv2/imgproc.hpp>
+
 #include "vastome/accuracy.hpp"
 #include "vastome/braille.hpp"
 #include "vastome/image_pipeline.hpp"
+#include "vastome/line_motion.hpp"
 #include "vastome/protocol.hpp"
 #include "vastome/reading_cursor.hpp"
 #include "vastome/simulator.hpp"
@@ -97,6 +101,27 @@ int main() {
   check(ocr.elapsed_ms > 0.0, "OCR latency is measured");
   check(ocr.character_boxes.size() == ocr.text.size(),
         "OCR returns one position per recognized character");
+
+  const auto shift = [](const cv::Mat& source, double pixels) {
+    cv::Mat moved;
+    cv::Mat transform = cv::Mat::eye(2, 3, CV_64F);
+    transform.at<double>(0, 2) = pixels;
+    cv::warpAffine(source, moved, transform, source.size(), cv::INTER_LINEAR,
+                   cv::BORDER_CONSTANT, cv::Scalar(245));
+    return moved;
+  };
+  vastome::LineMotionTracker tracker(image);
+  const auto left = tracker.update(shift(image, -12.0));
+  check(left.valid && std::abs(left.delta_x + 12.0) < 1.0,
+        "optical flow measures forward reading displacement");
+  const auto still = tracker.update(shift(image, -12.0));
+  check(still.valid && std::abs(still.delta_x) < 0.5,
+        "stationary page produces no displacement");
+  const auto right = tracker.update(shift(image, -4.0));
+  check(right.valid && std::abs(right.delta_x - 8.0) < 1.0,
+        "optical flow measures reverse reading displacement");
+  const auto lost = tracker.update(cv::Mat(image.size(), image.type(), cv::Scalar(245)));
+  check(!lost.valid, "feature loss cannot emit a guessed displacement");
 
   if (failures == 0) {
     std::cout << "All edge tests passed.\n";

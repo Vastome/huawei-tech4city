@@ -16,8 +16,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 PROJECT_NAME = "Huawei Tech4City Braille Display"
-BOARD_FQBN = "arduino:mbed_rp2040:pico"
-ARDUINO_CORE = "arduino:mbed_rp2040"
+ARDUINO_PICO_INDEX = "https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json"
+ARDUINO_CTAGS_TAG = "5.8-arduino11"
 LIBRARIES = ["LiquidCrystal I2C"]
 SOURCE_SKETCH = ROOT / "sketch.ino"
 WRAPPER_DIR = ROOT / "simsrc"
@@ -49,6 +49,42 @@ def write_text(path: Path, content: str) -> None:
 def is_ios() -> bool:
     platform_blob = f"{platform.platform()} {platform.system()} {platform.machine()}".lower()
     return any(token in platform_blob for token in ("ios", "iphone", "ipad"))
+
+
+def board_configuration() -> tuple[str, str, list[str]]:
+    if platform.system() == "Darwin" and platform.machine().lower() in ("arm64", "aarch64"):
+        # Arduino's mbed_rp2040 package currently supplies an x86_64-only
+        # arm-none-eabi-g++ on macOS. Use the Pico core's native ARM64 tools.
+        return "rp2040:rp2040:rpipico", "rp2040:rp2040", ["--additional-urls", ARDUINO_PICO_INDEX]
+    return "arduino:mbed_rp2040:pico", "arduino:mbed_rp2040", []
+
+
+def needs_native_macos_tools() -> bool:
+    return platform.system() == "Darwin" and platform.machine().lower() in ("arm64", "aarch64")
+
+
+def ensure_native_ctags() -> Path:
+    native_dir = TOOLS_DIR / "ctags-native"
+    binary = native_dir / "ctags"
+    if binary.exists():
+        try:
+            command_output([str(binary), "--version"])
+            return native_dir
+        except (OSError, subprocess.CalledProcessError):
+            pass
+
+    source = TOOLS_DIR / "ctags-src"
+    if not source.exists():
+        run(["git", "clone", "--depth", "1", "--branch", ARDUINO_CTAGS_TAG,
+             "https://github.com/arduino/ctags.git", str(source)])
+    run([str(source / "configure"), f"--prefix={native_dir}"], cwd=source)
+    # Arduino ctags 5.8 defines __unused__, which collides with macOS 27's
+    # dirent.h. Include that system header before the legacy macro is defined.
+    run(["make", "-j4", "CFLAGS=-g -O2 -include dirent.h"], cwd=source)
+    native_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source / "ctags", binary)
+    command_output([str(binary), "--version"])
+    return native_dir
 
 
 def cli_on_path() -> str | None:
@@ -154,10 +190,11 @@ def mirror_sketch_to_wrapper() -> None:
 
 
 def install_dependencies(cli_path: str) -> None:
+    _, arduino_core, board_args = board_configuration()
     core_list = command_output([cli_path, "core", "list"])
     lib_list = command_output([cli_path, "lib", "list"])
 
-    core_installed = ARDUINO_CORE in core_list
+    core_installed = arduino_core in core_list
     libraries_installed = all(library_name in lib_list for library_name in LIBRARIES)
 
     if core_installed and libraries_installed:
@@ -165,12 +202,12 @@ def install_dependencies(cli_path: str) -> None:
         return
 
     try:
-        run([cli_path, "core", "update-index"])
+        run([cli_path, "core", "update-index", *board_args])
     except subprocess.CalledProcessError:
         print("Warning: could not update the Arduino package index. Continuing with cached packages when possible.")
 
     if not core_installed:
-        run([cli_path, "core", "install", ARDUINO_CORE])
+        run([cli_path, "core", "install", arduino_core, *board_args])
 
     for library_name in LIBRARIES:
         if library_name not in lib_list:
@@ -178,15 +215,21 @@ def install_dependencies(cli_path: str) -> None:
 
 
 def compile_firmware(cli_path: str) -> None:
+    board_fqbn, _, board_args = board_configuration()
+    tool_args = []
+    if needs_native_macos_tools():
+        tool_args = ["--build-property", f"runtime.tools.ctags.path={ensure_native_ctags()}"]
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
     run([
         cli_path,
         "compile",
         "--fqbn",
-        BOARD_FQBN,
+        board_fqbn,
         "--build-path",
         str(BUILD_DIR),
         str(WRAPPER_DIR),
+        *board_args,
+        *tool_args,
     ])
 
 

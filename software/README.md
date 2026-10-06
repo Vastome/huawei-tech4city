@@ -21,7 +21,8 @@ selected hardware target (Wokwi bridge or real Pico via Web Serial).
 - Shadow-balanced and adaptive-threshold image enhancement.
 - Preview-aligned cropping on desktop and mobile cameras.
 - Two local OCR passes with automatic best-result selection.
-- Grade 1 conversion logic that produces dot1-dot8 pin frames for hardware.
+- English six-dot Braille conversion with capital and number signs, packed into
+  eight-bit hardware frames with dots 7 and 8 off.
 - Direct Web Serial handoff to the Pico using `PINS:` dot1-dot8 bit frames.
 - Browser-side timing control using `CONFIG:` before each hardware send.
 - One-line Wokwi simulator handoff using `BATCH:<hold>,<blink>|<frames...>`.
@@ -34,6 +35,9 @@ Supported: clear printed English, one line at a time, under adequate lighting.
 
 Not yet supported: handwriting, complex page layouts, translation,
 summarisation, fingertip tracking or a physical Braille actuator.
+
+The C++ `edge/` demo now tracks one line's horizontal motion from a recorded
+video or desktop camera. This browser app still captures a line on demand.
 
 ## Run locally
 

@@ -46,6 +46,12 @@ No command in this branch contacts a physical board yet.
   reading cursor, recorded-offset replay, an HTML slider with a six-dot Braille
   display, a conceptual multi-column moving field, Braille event CSV, and
   tests for pause, jitter, skips and reverse reading.
+- One-line video/camera capture with optical-flow displacement, immediate
+  virtual-cell output, tracking-loss detection, and recorded replay.
+- Synthetic moving-line mode that exercises the optical-flow path without
+  requiring a camera or external video file.
+- Apple Silicon Pico build support in `hardware/setup_wokwi.py`; web/Pico
+  hardware frames now use the same six-dot capital and number indicators as C++.
 
 ## Verified on the handoff machine
 
@@ -95,14 +101,16 @@ See `edge/README.md` for the real-image manifest format.
 ## Not implemented yet
 
 The original `vastome_edge_sim` still streams a complete OCR line. The new
-`vastome_position_sim` gates cell output on a replayed image offset. It does
-**not** yet track a real fingertip or camera movement. The timestamp field in
-the trace is informational; the simulator processes positions in file order.
+`vastome_position_sim` gates cell output on a trace or tracks a single line
+from video/camera frames. It does **not** yet locate the actual fingertip or
+re-run OCR after the first video frame. The timestamp field in an imported
+trace is informational; the simulator processes positions in file order.
 
 Missing production work:
 
-- Continuous Raspberry Pi camera capture.
-- Optical-flow or text-box tracking between OCR frames.
+- Continuous Raspberry Pi camera capture (desktop capture is implemented).
+- Reacquiring OCR and text boxes as new words or lines enter the camera view.
+- Asynchronous OCR and a look-ahead buffer; current capture recognizes once.
 - A fixed reading cursor calibrated to the fingertip contact point.
 - Sensor-level debounce and hysteresis for live fingertip tracking; the
   recorded-offset simulator already applies a 6-pixel margin.
@@ -121,9 +129,9 @@ Missing production work:
 1. **Position-controlled desktop simulator — implemented**
    - See `edge/README.md` for the command and replay format.
 
-2. **Continuous camera pipeline on the computer**
-   - Run tracking at camera frame rate.
-   - Run OCR asynchronously and less frequently.
+2. **Continuous camera pipeline on the computer — first-line tracking implemented**
+   - OpenCV tracks horizontal displacement at capture frame rate.
+   - Next: re-run OCR asynchronously and less frequently.
    - Keep several recognized characters ahead of the cursor in a ring buffer,
      so OCR is not on the immediate tactile-output path.
 

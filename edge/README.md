@@ -78,6 +78,42 @@ trace includes pauses, small backward jitter and reverse rereading.
 `events.csv` records each character crossing and the Braille cells delivered
 through the existing simulated serial link.
 
+To try the motion tracker without finding a video or granting camera access:
+
+```bash
+./edge/build/vastome_position_sim \
+  --synthetic-motion "Hello 12" \
+  --output edge/out/motion-demo
+```
+
+This moves a generated printed line through the same optical-flow tracker,
+including a reverse pass. Open `edge/out/motion-demo/index.html` to replay it.
+
+To track movement from a recorded one-line video or a local camera instead of
+using a prepared offset trace:
+
+```bash
+./edge/build/vastome_position_sim \
+  --video /absolute/path/to/one-line.mp4 \
+  --roi 0,180,1280,180 \
+  --output edge/out/video-reading
+
+./edge/build/vastome_position_sim \
+  --camera 0 --roi 0,180,1280,180 --max-frames 300 \
+  --output edge/out/camera-reading
+```
+
+The region of interest is `x,y,width,height` in **input-frame pixels**; omit it
+when the video already contains only one printed line. The first frame is
+recognized once. Later frames use OpenCV optical flow to estimate horizontal
+displacement and emit virtual Braille cells immediately in the terminal. Pauses
+and reverse movement work without repeating OCR. When tracking loses the line,
+the offset freezes instead of guessing; the final report counts those frames.
+After capture, open the generated `index.html` for replay and inspect
+`events.csv` for delivered cells. This is still a one-line desktop prototype:
+it does not reacquire a new line, correct camera rotation, or drive a physical
+actuator. Camera mode stops after `--max-frames` (default 300) frames.
+
 To replay a recorded movement trace, provide one image offset in pixels per
 line, or `time_ms<TAB>offset_px` (the timestamp is currently informational):
 

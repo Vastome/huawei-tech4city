@@ -5,7 +5,7 @@ Built for the Huawei Tech4City competition by the Vastome team.
 Canonical repository:
 https://github.com/Vastome/huawei-tech4city
 
-This folder contains the hardware half of the project: a Raspberry Pi Pico Wokwi simulation that shows an 8-dot braille pattern on a MAX7219 dot matrix and highlights the current character on an I2C LCD.
+This folder contains the hardware half of the project: a Raspberry Pi Pico Wokwi simulation that shows six-dot Braille on a MAX7219 LED matrix with eight available dot positions and labels the current cell on an I2C LCD.
 
 Note: this folder is maintained inside the main repository above (it is not a separate Git repository).
 
@@ -28,6 +28,11 @@ It now also accepts direct remote handoff frames over serial from the software d
 - installs the LCD library used by the sketch
 - compiles the firmware into `simsrc/build/`
 - refreshes `wokwi.toml` so it points to the generated firmware
+
+On Apple Silicon macOS, the script selects the Raspberry Pi Pico core with a
+native ARM64 compiler and builds Arduino's `ctags` locally for the same
+architecture. Its downloaded tools stay under ignored `hardware/.tools/`;
+other desktop systems continue to use the Arduino Mbed Pico core.
 
 On iOS, the script only prepares the project files. Native firmware compilation and the desktop Wokwi extension are not available there, so use the browser-based Wokwi simulator for viewing the diagram or run the setup script on a desktop OS to build the firmware.
 
@@ -65,13 +70,14 @@ elf = 'simsrc/build/simsrc.ino.elf'
 ## Project notes
 
 - The braille display is wired for the Vastome Huawei Tech4City build.
-- The MAX7219 matrix uses the top-left 4x2 area for the 8-dot braille cell.
+- The MAX7219 matrix uses the top-left 4x2 area; the bottom two positions stay off for the shared six-dot reader.
 - The serial monitor is connected over UART on GP0 and GP1.
 - The companion OCR web app lives in the sibling `software/` folder at the repository root.
 - The Wokwi simulator can accept a single pasted command in the serial monitor using `BATCH:<holdMs>,<blinkMs>|<frames...>`.
 - Direct software handoff uses `CONFIG:` lines such as `CONFIG:700,233`.
 - Direct software handoff uses `PINS:` lines such as `PINS:10000000,11000000`.
 - Each frame contains 8 dot bits in dot order `1..8`, where `1` means the pin is raised for that cell.
+- The shared English reader uses six-dot Braille. Dots 7 and 8 stay off in the existing eight-bit Pico/Wokwi frame format; capital and number signs are separate frames.
 - The firmware replies with `ACK CONFIG ...`, `FRAME x/y`, `OK remote frames displayed`, or `ERR ...`.
 
 ## License

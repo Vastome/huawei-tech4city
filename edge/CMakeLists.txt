@@ -5,7 +5,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs videoio)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs video videoio)
+if(OpenCV_VERSION VERSION_GREATER_EQUAL 5)
+    find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs features video videoio)
+endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(Tesseract REQUIRED IMPORTED_TARGET tesseract)
 
@@ -13,6 +16,7 @@ add_library(vastome_edge
     src/accuracy.cpp
     src/braille.cpp
     src/image_pipeline.cpp
+    src/line_motion.cpp
     src/protocol.cpp
     src/reading_cursor.cpp
     src/simulator.cpp

@@ -404,9 +404,11 @@
       if (!playing) return;
       if (current >= data.offsets.length - 1) { stopPlayback(); return; }
       const distance = Math.abs(data.offsets[current + 1] - data.offsets[current]);
-      const durationMs = distance < .1 ? 360 : Math.max(230, Math.min(900, distance * 13));
+      const durationMs = data.frameIntervalMs > 0
+        ? data.frameIntervalMs
+        : distance < .1 ? 360 : Math.max(230, Math.min(900, distance * 13));
       render(current + 1, true, durationMs);
-      playTimer = window.setTimeout(playNext, durationMs + 80);
+      playTimer = window.setTimeout(playNext, durationMs + (data.frameIntervalMs > 0 ? 0 : 80));
     }
     $("#play").addEventListener("click", () => {
       if (playing) { stopPlayback(); return; }

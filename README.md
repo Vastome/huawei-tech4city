@@ -6,7 +6,7 @@ This repository includes:
 
 - `hardware/`: Raspberry Pi Pico + Wokwi hardware simulation (MAX7219 + LCD)
 - `software/`: browser OCR app that captures printed text and sends hardware frames
-- `edge/`: C++ Raspberry Pi/ESP32 software simulator, OCR pipeline and accuracy benchmark
+- `edge/`: C++ Raspberry Pi/ESP32 software simulator, OCR and position tracking from images/video/camera
 - `run_project.py`: cross-platform launcher for install, demo, and verification
 - `wokwi_terminal_bridge.py`: local bridge for Wokwi Serial Monitor handoff
 
@@ -53,7 +53,10 @@ python run_project.py verify
 - `software <script>`: run software script (`dev`, `build`, `start`, `test`, `lint`)
 - `edge`: build and test the C++ Raspberry Pi/ESP32 simulator
 - `bridge`: run the local Wokwi bridge directly
-- `verify`: hardware compile + software tests + lint
+- `verify`: hardware compile + software build/tests/lint + C++ build/tests
+
+For a desktop video or camera position-tracking demo, build with
+`python3 run_project.py edge`, then see [edge/README.md](edge/README.md).
 
 ## End-to-End Demo Flow
 

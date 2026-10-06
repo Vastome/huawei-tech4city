@@ -1,5 +1,5 @@
 /*
-  Dynamic 8-Dot Braille Display with I2C LCD Highlight
+  Six-Dot Braille on an Eight-Position LED Matrix with I2C LCD Highlight
   (Raspberry Pi Pico / RP2040 version — Wokwi simulation)
   -----------------------------------------------------------------
   Matches this diagram.json exactly:
@@ -25,7 +25,7 @@
   pico GP0 -> $serialMonitor:RX
   pico GP1 -> $serialMonitor:TX
 
-  Dot numbering used (8-dot / computer braille):
+  Dot positions in the eight-bit transport (the reader uses dots 1-6):
       1 4
       2 5
       3 6
@@ -72,7 +72,7 @@ String usbInputBuffer;
 unsigned long remoteLetterDisplayMs = DEFAULT_LETTER_DISPLAY_MS;
 unsigned long remoteBlinkMs = DEFAULT_BLINK_MS;
 
-// ---- 8-dot Braille lookup table (dots 1-6 = standard braille, 7-8 unused = 0) ----
+// ---- Six-dot Braille lookup table (dots 7-8 unused = 0) ----
 struct BrailleMap {
   char ch;
   byte pattern;
@@ -229,8 +229,12 @@ void updateRemoteFrameStatus(int currentIndex, int totalFrames, byte pattern) {
   lcd.print("/");
   lcd.print(totalFrames);
   lcd.setCursor(0, 1);
-  lcd.print("Char: ");
-  if (symbol == ' ') {
+  lcd.print("Cell: ");
+  if (pattern == 0b00100000) { // dot 6: capital sign
+    lcd.print("[capital]");
+  } else if (pattern == 0b00111100) { // dots 3-6: number sign
+    lcd.print("[number]");
+  } else if (symbol == ' ') {
     lcd.print("[space]");
   } else {
     lcd.print(symbol);
