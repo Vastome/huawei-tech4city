@@ -16,6 +16,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 HARDWARE_DIR = ROOT / "hardware"
 SOFTWARE_DIR = ROOT / "software"
+EDGE_DIR = ROOT / "edge"
+EDGE_BUILD_DIR = EDGE_DIR / "build"
 HARDWARE_SETUP = HARDWARE_DIR / "setup_wokwi.py"
 SOFTWARE_NODE_MODULES = SOFTWARE_DIR / "node_modules"
 WOKWI_BRIDGE = ROOT / "wokwi_terminal_bridge.py"
@@ -65,6 +67,8 @@ def ensure_paths() -> None:
         raise FileNotFoundError(f"Missing hardware setup script: {HARDWARE_SETUP}")
     if not (SOFTWARE_DIR / "package.json").exists():
         raise FileNotFoundError(f"Missing software package.json: {SOFTWARE_DIR / 'package.json'}")
+    if not (EDGE_DIR / "CMakeLists.txt").exists():
+        raise FileNotFoundError(f"Missing edge CMake project: {EDGE_DIR / 'CMakeLists.txt'}")
     if not WOKWI_BRIDGE.exists():
         raise FileNotFoundError(f"Missing Wokwi bridge script: {WOKWI_BRIDGE}")
 
@@ -94,6 +98,20 @@ def run_software_script(script_name: str, install: bool = True, env: dict[str, s
     if install:
         ensure_software_dependencies()
     run([executable_name("npm"), "run", script_name], cwd=SOFTWARE_DIR, env=env)
+
+
+def run_edge_build(run_tests: bool = True) -> None:
+    if not command_exists("cmake"):
+        raise RuntimeError(
+            "cmake was not found. On macOS run: brew install cmake opencv tesseract",
+        )
+    run(
+        ["cmake", "-S", str(EDGE_DIR), "-B", str(EDGE_BUILD_DIR), "-DCMAKE_BUILD_TYPE=Release"],
+        cwd=ROOT,
+    )
+    run(["cmake", "--build", str(EDGE_BUILD_DIR), "--parallel"], cwd=ROOT)
+    if run_tests:
+        run(["ctest", "--test-dir", str(EDGE_BUILD_DIR), "--output-on-failure"], cwd=ROOT)
 
 
 def bridge_health_ok(host: str, port: int, timeout_seconds: float = 0.8) -> bool:
@@ -209,7 +227,11 @@ def verify_command(_: argparse.Namespace) -> int:
     run_hardware(prepare_only=False)
     run_software_script("test")
     run_software_script("lint", install=False)
-    print("\nVerification complete: hardware compiled, software tests passed, and lint passed.")
+    run_edge_build(run_tests=True)
+    print(
+        "\nVerification complete: hardware compiled; web build, tests and lint passed; "
+        "C++ edge build and tests passed.",
+    )
     return 0
 
 
@@ -221,6 +243,11 @@ def hardware_command(args: argparse.Namespace) -> int:
 
 def software_command(args: argparse.Namespace) -> int:
     run_software_script(args.script)
+    return 0
+
+
+def edge_command(args: argparse.Namespace) -> int:
+    run_edge_build(run_tests=not args.no_test)
     return 0
 
 
@@ -270,6 +297,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     software_parser.set_defaults(handler=software_command)
 
+    edge_parser = subparsers.add_parser(
+        "edge",
+        help="Build and test the C++ Raspberry Pi/ESP32 edge simulator.",
+    )
+    edge_parser.add_argument(
+        "--no-test",
+        action="store_true",
+        help="Build without running the C++ test suite.",
+    )
+    edge_parser.set_defaults(handler=edge_command)
+
     demo_parser = subparsers.add_parser(
         "demo",
         help="Compile hardware, then start the software development server.",
@@ -314,7 +352,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     verify_parser = subparsers.add_parser(
         "verify",
-        help="Run the full validation pass for hardware and software.",
+        help="Run the full validation pass for hardware, web software and C++ edge software.",
     )
     verify_parser.set_defaults(handler=verify_command)
 

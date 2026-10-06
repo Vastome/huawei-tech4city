@@ -6,6 +6,7 @@ This repository includes:
 
 - `hardware/`: Raspberry Pi Pico + Wokwi hardware simulation (MAX7219 + LCD)
 - `software/`: browser OCR app that captures printed text and sends hardware frames
+- `edge/`: C++ Raspberry Pi/ESP32 software simulator, OCR pipeline and accuracy benchmark
 - `run_project.py`: cross-platform launcher for install, demo, and verification
 - `wokwi_terminal_bridge.py`: local bridge for Wokwi Serial Monitor handoff
 
@@ -13,6 +14,7 @@ This repository includes:
 
 - Python 3.10+
 - Node.js 22.13+
+- CMake 3.20+, OpenCV and Tesseract (for the C++ edge simulator)
 - VS Code with Wokwi extension (for simulator workflow)
 - Chrome or Edge desktop (required for Web Serial to real Pico)
 
@@ -40,6 +42,7 @@ python run_project.py demo
 python run_project.py demo --prepare-only
 python run_project.py hardware --prepare-only
 python run_project.py software dev
+python run_project.py edge
 python run_project.py bridge
 python run_project.py verify
 ```
@@ -48,6 +51,7 @@ python run_project.py verify
 - `demo`: full integrated run (hardware prep + bridge + software dev)
 - `hardware`: run only hardware setup/compile path
 - `software <script>`: run software script (`dev`, `build`, `start`, `test`, `lint`)
+- `edge`: build and test the C++ Raspberry Pi/ESP32 simulator
 - `bridge`: run the local Wokwi bridge directly
 - `verify`: hardware compile + software tests + lint
 
@@ -94,6 +98,7 @@ Hardware replies include:
 
 - `hardware/README.md`: hardware-specific setup and notes
 - `software/README.md`: software-specific setup and tests
+- `edge/README.md`: C++ build, simulator, fault injection and OCR benchmark
 
 ## License
 

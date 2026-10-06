@@ -1,5 +1,7 @@
 # Build artifacts
 hardware/simsrc/build/
+edge/build/
+edge/out/
 *.uf2
 *.elf
 *.hex
