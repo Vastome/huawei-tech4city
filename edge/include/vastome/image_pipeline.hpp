@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <opencv2/core/mat.hpp>
+#include <opencv2/core/types.hpp>
 
 namespace vastome {
 
@@ -37,6 +38,9 @@ struct OcrResult {
   std::string preprocessing_variant;
   ImageQuality quality;
   cv::Mat normalized_line;
+  // One box per byte of the supported printed-English OCR text, including
+  // inferred boxes for spaces or symbols Tesseract could not locate.
+  std::vector<cv::Rect> character_boxes;
 };
 
 class ImagePipeline {

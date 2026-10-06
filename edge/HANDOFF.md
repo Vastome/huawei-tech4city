@@ -42,6 +42,10 @@ No command in this branch contacts a physical board yet.
   retry behaviour, character error rate and clear-line OCR.
 - Root `run_project.py edge` build/test command, and C++ checks included in
   `run_project.py verify`.
+- Position-controlled desktop simulator with OCR character boxes, a fixed
+  reading cursor, recorded-offset replay, an HTML slider with a six-dot Braille
+  display, a conceptual multi-column moving field, Braille event CSV, and
+  tests for pause, jitter, skips and reverse reading.
 
 ## Verified on the handoff machine
 
@@ -90,18 +94,20 @@ See `edge/README.md` for the real-image manifest format.
 
 ## Not implemented yet
 
-The current simulator recognizes one complete image and then streams every
-Braille cell using a fixed hold time. It does **not** yet synchronize the cell
-with the user's finger position.
+The original `vastome_edge_sim` still streams a complete OCR line. The new
+`vastome_position_sim` gates cell output on a replayed image offset. It does
+**not** yet track a real fingertip or camera movement. The timestamp field in
+the trace is informational; the simulator processes positions in file order.
 
 Missing production work:
 
 - Continuous Raspberry Pi camera capture.
-- OCR output with a bounding box for every character.
 - Optical-flow or text-box tracking between OCR frames.
 - A fixed reading cursor calibrated to the fingertip contact point.
-- Debounce and hysteresis so a character is not emitted repeatedly.
-- Direction tracking for left-to-right reading and reverse rereading.
+- Sensor-level debounce and hysteresis for live fingertip tracking; the
+  recorded-offset simulator already applies a 6-pixel margin.
+- Direction tracking from live camera frames; the simulator already handles
+  forward and reverse offset traces.
 - Speed detection and a slow-down warning when one physical cell cannot keep
   up with the finger.
 - A real UART/USB implementation of `FrameTransport`.
@@ -112,11 +118,8 @@ Missing production work:
 
 ## Recommended next implementation order
 
-1. **Position-controlled desktop simulator**
-   - Render recognized character boxes and a fixed reading cursor.
-   - Drive the cursor with a slider or recorded movement trace.
-   - Emit a new Braille cell only when a new box crosses the cursor.
-   - Test pauses, reverse movement, jitter and skipped boxes.
+1. **Position-controlled desktop simulator — implemented**
+   - See `edge/README.md` for the command and replay format.
 
 2. **Continuous camera pipeline on the computer**
    - Run tracking at camera frame rate.
@@ -145,4 +148,3 @@ Never drive a coil or solenoid directly from a Raspberry Pi or ESP32 GPIO pin.
 Use a correctly rated driver, flyback protection, an external actuator supply
 and a shared ground. Hardware limits must be confirmed from the selected cell,
 not inferred from this simulator.
-

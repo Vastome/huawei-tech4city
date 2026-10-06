@@ -6,6 +6,7 @@
 #include "vastome/braille.hpp"
 #include "vastome/image_pipeline.hpp"
 #include "vastome/protocol.hpp"
+#include "vastome/reading_cursor.hpp"
 #include "vastome/simulator.hpp"
 #include "vastome/synthetic.hpp"
 
@@ -32,6 +33,35 @@ int main() {
   check(cells[3].bit_string() == "100000", "digit 1 uses letter a");
   check(cells[4].bit_string() == "110000", "digit 2 uses letter b");
   check(cells[5].bits() == 0, "space lowers all dots");
+  const auto mapped = encoder.encode_mapped("A12");
+  check(mapped.size() == 5 && mapped[0].source_index == 0 &&
+            mapped[1].source_index == 0 && mapped[2].source_index == 1 &&
+            mapped[3].source_index == 1 && mapped[4].source_index == 2,
+        "Braille indicators remain attached to their source character");
+
+  vastome::ReadingCursor cursor("A12", {10.0, 30.0, 50.0}, 100.0, 4.0);
+  check(cursor.update(100.0).empty(), "initial position emits nothing");
+  auto crossings = cursor.update(86.0);
+  check(crossings.size() == 1 && crossings[0].character_index == 0 &&
+            crossings[0].cells.size() == 2,
+        "forward crossing emits capital indicator and character once");
+  check(cursor.update(86.0).empty() && cursor.update(90.0).empty() &&
+            cursor.update(86.0).empty(),
+        "pause and small jitter do not re-emit a character");
+  crossings = cursor.update(40.0);
+  check(crossings.size() == 2 && crossings[0].character_index == 1 &&
+            crossings[1].character_index == 2 &&
+            crossings[0].cells.size() == 2 && crossings[1].cells.size() == 1,
+        "a skipped position emits all crossed characters in order");
+  crossings = cursor.update(76.0);
+  check(crossings.size() == 2 &&
+            crossings[0].character_index == 2 &&
+            crossings[1].character_index == 1 &&
+            crossings[0].direction == vastome::ReadingDirection::reverse,
+        "reverse reading emits crossed characters in reverse order");
+  crossings = cursor.update(95.0);
+  check(crossings.size() == 1 && crossings[0].character_index == 0,
+        "reverse reading reaches the first character");
 
   const vastome::BrailleFrame frame{.sequence = 42, .bits = 0x25, .hold_ms = 300};
   const std::string wire = vastome::serialize_frame(frame);
@@ -65,6 +95,8 @@ int main() {
   check(ocr_score.character_accuracy >= 0.95,
         "OCR recognizes a clear printed line at >=95% character accuracy");
   check(ocr.elapsed_ms > 0.0, "OCR latency is measured");
+  check(ocr.character_boxes.size() == ocr.text.size(),
+        "OCR returns one position per recognized character");
 
   if (failures == 0) {
     std::cout << "All edge tests passed.\n";

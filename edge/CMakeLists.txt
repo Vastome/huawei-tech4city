@@ -14,6 +14,7 @@ add_library(vastome_edge
     src/braille.cpp
     src/image_pipeline.cpp
     src/protocol.cpp
+    src/reading_cursor.cpp
     src/simulator.cpp
     src/synthetic.cpp
 )
@@ -29,6 +30,10 @@ target_link_libraries(vastome_accuracy_benchmark PRIVATE vastome_edge)
 
 add_executable(vastome_dataset_benchmark apps/dataset_benchmark.cpp)
 target_link_libraries(vastome_dataset_benchmark PRIVATE vastome_edge)
+
+add_executable(vastome_position_sim apps/position_sim.cpp)
+target_link_libraries(vastome_position_sim PRIVATE vastome_edge)
+configure_file(assets/position_viewer.html position_viewer.html COPYONLY)
 
 enable_testing()
 add_executable(vastome_edge_tests tests/edge_tests.cpp)

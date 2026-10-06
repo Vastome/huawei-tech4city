@@ -89,34 +89,47 @@ BrailleCell BrailleEncoder::from_dots(const std::initializer_list<int> dots,
 }
 
 std::vector<BrailleCell> BrailleEncoder::encode(std::string_view text) const {
+  const auto mapped = encode_mapped(text);
   std::vector<BrailleCell> output;
+  output.reserve(mapped.size());
+  for (const auto& entry : mapped) output.push_back(entry.cell);
+  return output;
+}
+
+std::vector<MappedBrailleCell> BrailleEncoder::encode_mapped(
+    std::string_view text) const {
+  std::vector<MappedBrailleCell> output;
   output.reserve(text.size() * 2);
   bool number_mode = false;
-  for (const char raw : text) {
+  for (std::size_t index = 0; index < text.size(); ++index) {
+    const char raw = text[index];
+    const auto append = [&output, index](BrailleCell cell) {
+      output.push_back({.cell = cell, .source_index = index});
+    };
     const unsigned char byte = static_cast<unsigned char>(raw);
     if (std::isdigit(byte) != 0) {
       if (!number_mode) {
-        output.push_back(from_dots({3, 4, 5, 6}, '#', true));
+        append(from_dots({3, 4, 5, 6}, '#', true));
         number_mode = true;
       }
       const char digit = raw == '0' ? 'j' : static_cast<char>('a' + raw - '1');
-      output.push_back(cell_from_array(letter_table().at(digit), raw));
+      append(cell_from_array(letter_table().at(digit), raw));
       continue;
     }
     number_mode = false;
     if (raw == ' ') {
-      output.push_back(BrailleCell{.source = raw});
+      append(BrailleCell{.source = raw});
       continue;
     }
     if (std::isupper(byte) != 0) {
-      output.push_back(from_dots({6}, '^', true));
+      append(from_dots({6}, '^', true));
     }
     const char lowered = static_cast<char>(std::tolower(byte));
     const auto match = letter_table().find(lowered);
     if (match != letter_table().end()) {
-      output.push_back(cell_from_array(match->second, raw));
+      append(cell_from_array(match->second, raw));
     } else {
-      output.push_back(cell_from_array(letter_table().at('?'), '?'));
+      append(cell_from_array(letter_table().at('?'), '?'));
     }
   }
   return output;

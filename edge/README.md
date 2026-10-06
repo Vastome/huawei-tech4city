@@ -55,6 +55,55 @@ Prove that retry works while every second transmission is dropped:
 ESP32 packet validation and six GPIO/actuator states. These are software models
 running on the computer; they are not proof that physical boards were contacted.
 
+## Try position-controlled reading
+
+Build with `python3 run_project.py edge`, then run:
+
+```bash
+./edge/build/vastome_position_sim \
+  --synthetic "Hello 12" \
+  --output edge/out/position-demo
+```
+
+Open `edge/out/position-demo/index.html` locally. Its slider replays a
+movement trace over the OCR line image: teal boxes mark characters, the orange
+line is the fixed reading cursor, and the six raised/recessed dots show the
+last emitted Braille cell. The second panel shows the translated Braille line
+moving beneath a fixed fingertip pad, inspired by the team's earlier device
+concept. That moving field is a **visual concept**; the C++ transport still
+sends one six-dot cell at each character crossing. Use the slider, arrow
+buttons, Play/Pause, or drag the printed line directly.
+The page respects reduced-motion settings and works offline. The generated
+trace includes pauses, small backward jitter and reverse rereading.
+`events.csv` records each character crossing and the Braille cells delivered
+through the existing simulated serial link.
+
+To replay a recorded movement trace, provide one image offset in pixels per
+line, or `time_ms<TAB>offset_px` (the timestamp is currently informational):
+
+```text
+600
+570
+540
+540
+542
+510
+```
+
+```bash
+./edge/build/vastome_position_sim \
+  --image /absolute/path/to/printed-line.jpg \
+  --trace /absolute/path/to/offsets.tsv \
+  --output edge/out/my-reading
+```
+
+Negative offsets move the OCR image left past the cursor. The first position
+sets the baseline and emits nothing. A character is emitted when its center
+crosses the cursor with a 6-pixel hysteresis margin; a large movement emits
+every crossed character in order. A deliberate reverse crossing emits
+characters in reverse order. All outputs are still simulated, not physical
+actuator measurements.
+
 ## Run the repeatable benchmark
 
 ```bash

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <memory>
 #include <stdexcept>
@@ -97,6 +98,60 @@ std::string clean_ocr_text(std::string text) {
     output.push_back(character);
   }
   return output;
+}
+
+std::vector<cv::Rect> character_boxes(tesseract::TessBaseAPI& api,
+                                     const cv::Mat& image,
+                                     std::string_view text) {
+  std::vector<cv::Rect> boxes(text.size());
+  api.SetImage(image.data, image.cols, image.rows, image.channels(),
+               static_cast<int>(image.step));
+  api.SetSourceResolution(300);
+  api.Recognize(nullptr);
+  tesseract::ResultIterator* iterator = api.GetIterator();
+  std::size_t index = 0;
+  if (iterator != nullptr) {
+    do {
+      std::unique_ptr<char[]> raw(iterator->GetUTF8Text(tesseract::RIL_SYMBOL));
+      if (!raw || raw[0] == '\0' || raw[1] != '\0') continue;
+      const unsigned char symbol = static_cast<unsigned char>(raw[0]);
+      if (symbol >= 128) continue;
+      while (index < text.size() && text[index] == ' ') ++index;
+      while (index < text.size() &&
+             std::tolower(static_cast<unsigned char>(text[index])) !=
+                 std::tolower(symbol)) {
+        ++index;
+      }
+      if (index == text.size()) break;
+      int left = 0, top = 0, right = 0, bottom = 0;
+      if (iterator->BoundingBox(tesseract::RIL_SYMBOL, &left, &top, &right,
+                                &bottom) && right > left && bottom > top) {
+        boxes[index] = cv::Rect(left, top, right - left, bottom - top);
+      }
+      ++index;
+    } while (iterator->Next(tesseract::RIL_SYMBOL));
+  }
+  // Tesseract omits spaces. Keep the geometry ordered even when a symbol box
+  // is unavailable, so the cursor still has a usable position for each cell.
+  const double fallback_width = static_cast<double>(image.cols) /
+                                static_cast<double>(std::max<std::size_t>(1, text.size()));
+  for (std::size_t i = 0; i < boxes.size(); ++i) {
+    if (boxes[i].width > 0) continue;
+    int left = static_cast<int>(std::round(fallback_width * static_cast<double>(i)));
+    int right = static_cast<int>(std::round(fallback_width * static_cast<double>(i + 1)));
+    if (i > 0 && boxes[i - 1].width > 0) left = boxes[i - 1].x + boxes[i - 1].width;
+    for (std::size_t next = i + 1; next < boxes.size(); ++next) {
+      if (boxes[next].width > 0) {
+        right = boxes[next].x;
+        break;
+      }
+    }
+    left = std::clamp(left, 0, image.cols - 1);
+    right = std::clamp(right, left + 1, image.cols);
+    boxes[i] = cv::Rect(left, 0, right - left, image.rows);
+  }
+  api.Clear();
+  return boxes;
 }
 
 ImageQuality assess_quality(const cv::Mat& gray, const double skew) {
@@ -232,6 +287,10 @@ OcrResult ImagePipeline::recognize_line(const cv::Mat& input) {
     impl_->api.Clear();
   }
   best.confidence = std::clamp(best.confidence, 0.0, 1.0);
+  if (!best.text.empty()) {
+    best.character_boxes = character_boxes(impl_->api, best.normalized_line,
+                                            best.text);
+  }
   best.quality = quality;
   const auto finished = std::chrono::steady_clock::now();
   best.elapsed_ms =
