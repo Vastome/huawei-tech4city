@@ -80,6 +80,7 @@ a manual fallback.
 
 ```bash
 npm test
+npm run typecheck
 ```
 
 This builds the production bundle and verifies the rendered prototype,

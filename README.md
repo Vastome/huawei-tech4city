@@ -53,7 +53,7 @@ python run_project.py verify
 - `software <script>`: run software script (`dev`, `build`, `start`, `test`, `lint`)
 - `edge`: build and test the C++ Raspberry Pi/ESP32 simulator
 - `bridge`: run the local Wokwi bridge directly
-- `verify`: hardware compile + software build/tests/lint + C++ build/tests
+- `verify`: hardware compile + software build/tests/lint/typecheck + C++ build/tests
 
 For a desktop video or camera position-tracking demo, build with
 `python3 run_project.py edge`, then see [edge/README.md](edge/README.md).

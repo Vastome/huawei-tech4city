@@ -227,9 +227,10 @@ def verify_command(_: argparse.Namespace) -> int:
     run_hardware(prepare_only=False)
     run_software_script("test")
     run_software_script("lint", install=False)
+    run_software_script("typecheck", install=False)
     run_edge_build(run_tests=True)
     print(
-        "\nVerification complete: hardware compiled; web build, tests and lint passed; "
+        "\nVerification complete: hardware compiled; web build, tests, lint and types passed; "
         "C++ edge build and tests passed.",
     )
     return 0
